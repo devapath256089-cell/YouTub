@@ -15,16 +15,18 @@ android {
         minSdk = 24
         targetSdk = 36
 
-        versionCode = 18
-        versionName = "1.4.3"
+        versionCode = 20
+        versionName = "1.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
+            // Sideload-friendly: sign release with the debug key so the APK installs directly
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -101,8 +103,19 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
 
-    // NewPipe Extractor
-    implementation(libs.newpipe.extractor)
+    // NewPipe Extractor â€” PipePipe fork (InfinityLoop1308) built locally: adds SABR streaming
+    // classes (YoutubeSabrInfo/Request/Session etc.) missing from the TeamNewPipe artifact.
+    implementation(files("libs/PipePipeExtractor.jar"))
+    implementation("com.github.TeamNewPipe:nanojson:1d9e1aea9049fc9f85e68b43ba39fe7be1c1f751")
+    implementation("org.jsoup:jsoup:1.22.2")
+    implementation("org.java-websocket:Java-WebSocket:1.6.0")
+    implementation("org.nibor.autolink:autolink:0.12.0")
+    implementation("com.google.protobuf:protobuf-java:4.35.1")
+    implementation("org.brotli:dec:0.1.2")
+    implementation("org.apache.commons:commons-lang3:3.20.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+    // Wire runtime (PipePipeExtractor protobuf search filters: TypeFilter etc. extends WireEnum)
+    implementation("com.squareup.wire:wire-runtime:6.4.1")
 
     // FFmpeg (from PipePipe - for download muxing)
     implementation(project(":ffmpeg"))

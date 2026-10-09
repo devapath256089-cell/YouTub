@@ -131,7 +131,7 @@ class VideoRepositoryImpl @Inject constructor(
 
     private fun extractAudioStreams(streamInfo: StreamInfo): List<StreamItem> {
         return streamInfo.audioStreams?.map {
-            StreamItem(url = it.url ?: "", quality = "${it.averageBitrate}kbps", format = it.format?.suffix ?: "m4a", languageTag = it.audioLocale?.language, trackType = it.audioTrackType?.name)
+            StreamItem(url = it.url ?: "", quality = "${it.averageBitrate}kbps", format = it.format?.suffix ?: "m4a", languageTag = it.audioLocale, trackType = it.audioTrackName)
         } ?: emptyList()
     }
 
@@ -143,9 +143,9 @@ class VideoRepositoryImpl @Inject constructor(
 
     private fun selectBestAudioStream(streamInfo: StreamInfo): AudioStream? {
         val streams = streamInfo.audioStreams ?: return null
-        val originals = streams.filter { it.audioTrackType == AudioTrackType.ORIGINAL }
+        val originals = streams.filter { it.audioTrackId == "0" }
         return if (originals.isNotEmpty()) originals.maxByOrNull { it.averageBitrate }
-        else streams.filter { it.audioLocale?.language == "en" }.maxByOrNull { it.averageBitrate } ?: streams.maxByOrNull { it.averageBitrate }
+        else streams.filter { it.audioLocale == "en" }.maxByOrNull { it.averageBitrate } ?: streams.maxByOrNull { it.averageBitrate }
     }
 
     override suspend fun getCachedStreamBundle(videoId: String): StreamBundle? {
@@ -202,7 +202,7 @@ class VideoRepositoryImpl @Inject constructor(
                         val extractor = ServiceList.YouTube.getChannelTabExtractor(handler)
                         extractor.fetchPage()
                         extractor.initialPage.items.filterIsInstance<PlaylistInfoItem>().map { 
-                            PlaylistItem(id = VideoUtils.extractPlaylistId(it.url), title = it.name ?: "Unknown", thumbnailUrl = it.thumbnails?.find { t -> t.width in 400..800 }?.url ?: it.thumbnails?.firstOrNull()?.url ?: "", uploaderName = it.uploaderName ?: "Unknown", uploaderUrl = it.uploaderUrl ?: "", streamCount = it.streamCount)
+                            PlaylistItem(id = VideoUtils.extractPlaylistId(it.url), title = it.name ?: "Unknown", thumbnailUrl = it.thumbnailUrl ?: "", uploaderName = it.uploaderName ?: "Unknown", uploaderUrl = "", streamCount = it.streamCount)
                         }
                     } catch (e: Exception) { PTLog.w("VideoRepository", "Failed to fetch channel playlists", e); emptyList() }
                 }
@@ -262,7 +262,7 @@ class VideoRepositoryImpl @Inject constructor(
 
     private fun mapToVideoItem(item: StreamInfoItem, uploaderThumbnailUrl: String? = null): VideoItem {
         val vId = VideoUtils.extractVideoId(item.url)
-        return VideoItem(id = vId, title = item.name ?: "Unknown", thumbnailUrl = VideoUtils.getThumbnailForList(vId), uploaderName = item.uploaderName ?: "Unknown", uploaderUrl = item.uploaderUrl ?: "", uploaderThumbnailUrl = uploaderThumbnailUrl ?: item.uploaderAvatars?.firstOrNull()?.url, viewCount = item.viewCount, subscriberCount = null, duration = item.duration, uploadDate = item.textualUploadDate ?: item.uploadDate?.offsetDateTime()?.toLocalDate()?.toString() ?: "", rawUploadDate = item.uploadDate?.instant?.toEpochMilli(), watchProgress = null)
+        return VideoItem(id = vId, title = item.name ?: "Unknown", thumbnailUrl = VideoUtils.getThumbnailForList(vId), uploaderName = item.uploaderName ?: "Unknown", uploaderUrl = item.uploaderUrl ?: "", uploaderThumbnailUrl = uploaderThumbnailUrl ?: item.thumbnailUrl, viewCount = item.viewCount, subscriberCount = null, duration = item.duration, uploadDate = item.textualUploadDate ?: item.uploadDate?.offsetDateTime()?.toLocalDate()?.toString() ?: "", rawUploadDate = item.uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli(), watchProgress = null)
     }
 
     override suspend fun getPlaylistDetails(playlistUrl: String): PlaylistDetails {
@@ -270,7 +270,7 @@ class VideoRepositoryImpl @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val info = PlaylistInfo.getInfo(ServiceList.YouTube, playlistUrl)
-                PlaylistDetails(id = VideoUtils.extractPlaylistId(info.url), title = info.name ?: "Unknown", uploaderName = info.uploaderName ?: "Unknown", uploaderUrl = info.uploaderUrl, thumbnailUrl = info.thumbnails?.find { it.width in 400..800 }?.url ?: info.thumbnails?.firstOrNull()?.url ?: "", videos = info.relatedItems.filterIsInstance<StreamInfoItem>().map { mapToVideoItem(it) })
+                PlaylistDetails(id = VideoUtils.extractPlaylistId(info.url), title = info.name ?: "Unknown", uploaderName = info.uploaderName ?: "Unknown", uploaderUrl = info.uploaderUrl, thumbnailUrl = info.thumbnailUrl ?: "", videos = info.relatedItems.filterIsInstance<StreamInfoItem>().map { mapToVideoItem(it) })
             } catch (e: Exception) {
                 PTLog.e("VideoRepository", "Error fetching playlist details for $playlistUrl", e)
                 throw e
@@ -330,7 +330,7 @@ class VideoRepositoryImpl @Inject constructor(
         item.commentId?.let { commentsCache.put(it, item) }
         return CommentItem(
             authorName = item.uploaderName ?: "Unknown",
-            authorThumbnailUrl = item.uploaderAvatars?.firstOrNull()?.url,
+            authorThumbnailUrl = item.thumbnailUrl,
             authorUrl = item.uploaderUrl,
             commentText = VideoUtils.sanitizeDescription(item.commentText.content),
             publishedTime = item.textualUploadDate,

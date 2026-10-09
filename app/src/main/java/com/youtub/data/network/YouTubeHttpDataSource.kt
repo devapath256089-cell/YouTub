@@ -45,12 +45,6 @@ class YouTubeHttpDataSource(
             .url(dataSpec.uri.toString())
             .header("User-Agent", userAgent)
 
-        // Attach PoToken and VisitorData
-        val visitorData = poTokenProvider.getVisitorData()
-        if (visitorData.isNotBlank()) {
-            requestBuilder.header("X-Goog-Visitor-Id", visitorData)
-        }
-
         // Handle Range Requests
         val rangeHeader = buildRangeHeader(dataSpec.position, dataSpec.length)
         if (rangeHeader != null) {

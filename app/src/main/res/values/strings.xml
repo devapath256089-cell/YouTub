@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name">YouTub</string>
 
     <!-- General -->
@@ -252,4 +252,7 @@
     <string name="downloads_storage_use_saf_summary">The \'Storage Access Framework\' allows downloads to an external SD card</string>
     <string name="download_has_started">Download has started</string>
     <string name="download_all_message">Please make sure you have selected the download folder and granted access, otherwise download will fail. Existed files will not be overwritten. If audio can not be downloaded separately, the corresponding video will be downloaded.</string>
+    <string name="msg_name">Filename</string>
+    <string name="msg_threads">Threads</string>
+    <string name="caption_setting_title">Captions</string>
 </resources>
