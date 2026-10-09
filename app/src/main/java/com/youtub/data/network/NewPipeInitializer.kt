@@ -5,7 +5,10 @@
 */
 package com.youtub.data.network
 
+import android.content.Context
 import com.youtub.utils.PTLog
+import com.youtub.utils.PlaybackDiagnostics
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +23,7 @@ import javax.inject.Singleton
 
 @Singleton
 class NewPipeInitializer @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val okHttpClient: OkHttpClient
 ) {
     private val initializationDeferred = CompletableDeferred<Unit>()
@@ -39,10 +43,16 @@ class NewPipeInitializer @Inject constructor(
                         Localization.DEFAULT,
                         ContentCountry("US")
                     )
+                    // v1.4.6: default "visionos" (IOS-family) streams get bot-gated
+                    // ("Sign in to confirm you're not a bot" -> intermittent 403 Playback
+                    // Error). TVHTML5 via PS4 spoof needs no PoToken and serves direct URLs.
+                    NewPipe.setYoutubePlayerClient("tv_downgraded")
                 }
+                PlaybackDiagnostics.init(appContext)
+                PlaybackDiagnostics.log("INIT", "NewPipe ok, player client=${NewPipe.getYoutubePlayerClient()}")
                 isInitialized = true
                 initializationDeferred.complete(Unit)
-                PTLog.d("NewPipeInitializer", "NewPipe initialized successfully")
+                PTLog.d("NewPipeInitializer", "NewPipe initialized successfully (client=${NewPipe.getYoutubePlayerClient()})")
             } catch (e: Exception) {
                 PTLog.e("NewPipeInitializer", "NewPipe initialization failed", e)
                 // We don't completeExceptionally here to allow retries if needed, 

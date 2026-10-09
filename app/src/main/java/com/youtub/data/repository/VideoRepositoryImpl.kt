@@ -12,6 +12,7 @@ import com.youtub.domain.model.*
 import com.youtub.domain.repository.VideoRepository
 import com.youtub.utils.Constants
 import com.youtub.utils.PTLog
+import com.youtub.utils.PlaybackDiagnostics
 import com.youtub.utils.VideoUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -41,6 +42,21 @@ class VideoRepositoryImpl @Inject constructor(
         initializer.ensureInitialized()
     }
 
+    private val preferredClient = java.util.concurrent.atomic.AtomicReference("tv_downgraded")
+
+    /**
+     * v1.4.6: bot-gating resilience. YouTube's "Sign in to confirm you're not a
+     * bot" wall intermittently blocks stream extraction per client/IP/session.
+     * Try the preferred client first (last one that succeeded), then the other
+     * direct-URL clients. mweb is excluded until the app's SABR runtime is
+     * verified end-to-end (SABR streams carry no per-format URLs).
+     */
+    private fun clientCandidates(): List<String> {
+        val all = listOf("tv_downgraded", "visionos")
+        val first = preferredClient.get()
+        return listOf(first) + all.filter { it != first }
+    }
+
     override suspend fun getStreamBundle(videoId: String, forceRefresh: Boolean): StreamBundle {
         if (videoId.isBlank()) throw IllegalArgumentException("Video ID cannot be blank")
         
@@ -53,6 +69,27 @@ class VideoRepositoryImpl @Inject constructor(
             }
         }
         
+        return withContext(Dispatchers.IO) {
+            var lastError: Exception? = null
+            for (client in clientCandidates()) {
+                try {
+                    org.schabi.newpipe.extractor.NewPipe.setYoutubePlayerClient(client)
+                    PlaybackDiagnostics.log("EXTRACT", "video=$videoId client=$client")
+                    val bundle = extractBundleOnce(videoId, isIncognito, client)
+                    preferredClient.set(client)
+                    PlaybackDiagnostics.log("EXTRACT_OK", "video=$videoId client=$client streams=${bundle.videoStreams.size} audio=${bundle.audioStreams.size}")
+                    return@withContext bundle
+                } catch (e: Exception) {
+                    lastError = e
+                    PlaybackDiagnostics.log("EXTRACT_FAIL", "video=$videoId client=$client err=${e.javaClass.simpleName}: ${e.message?.take(180)}")
+                    PTLog.e("VideoRepository", "Extraction failed (client=$client) for $videoId", e)
+                }
+            }
+            throw lastError ?: IllegalStateException("Stream extraction failed for $videoId")
+        }
+    }
+
+    private suspend fun extractBundleOnce(videoId: String, isIncognito: Boolean, client: String): StreamBundle {
         return withContext(Dispatchers.IO) {
             try {
                 val service = ServiceList.YouTube
@@ -101,7 +138,7 @@ class VideoRepositoryImpl @Inject constructor(
                 if (!isIncognito) streamCache.put(videoId, bundle)
                 bundle
             } catch (e: Exception) {
-                PTLog.e("VideoRepository", "Error fetching stream bundle for $videoId", e)
+                PTLog.e("VideoRepository", "Error fetching stream bundle for $videoId (client=$client)", e)
                 throw e
             }
         }

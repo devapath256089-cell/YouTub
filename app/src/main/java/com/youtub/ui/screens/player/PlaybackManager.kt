@@ -18,6 +18,7 @@ import androidx.media3.exoplayer.upstream.BandwidthMeter
 import com.youtub.domain.model.StreamBundle
 import com.youtub.domain.model.StreamItem
 import com.youtub.utils.PTLog
+import com.youtub.utils.PlaybackDiagnostics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -118,6 +119,7 @@ class PlaybackManager @Inject constructor(
 
         override fun onPlayerError(error: PlaybackException) {
             val cause = error.cause
+            PlaybackDiagnostics.log("PLAYER_ERR", "code=${error.errorCode} cause=${cause?.javaClass?.simpleName} http=${(cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode} msg=${cause?.message?.take(160)}")
             val isNetworkError = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
                                 error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                                 error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
